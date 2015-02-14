@@ -367,7 +367,6 @@ var Shortcode_UI;
 
 			self.head    = self.getEditorStyles().join( "\n" );
 			self.loading = wp.mce.View.prototype.loadingPlaceholder();
-			self.preview = self.loading;
 
 		},
 
@@ -378,12 +377,18 @@ var Shortcode_UI;
 		 */
 		render: function() {
 
-			self.preview = self.loading;
-			this.fetchShortcode();
+			var self = this;
 
-			this.renderIframe({
-				head: this.head,
-				body: this.preview,
+			self.renderIframe({
+				head: self.head,
+				body: self.loading,
+			});
+
+			self.fetchShortcode( function( response ) {
+				self.renderIframe({
+					head: self.head,
+					body: response,
+				});
 			});
 
 			return this;
@@ -464,6 +469,7 @@ var Shortcode_UI;
 
 		},
 
+
 		/**
 		 * Makes an AJAX call to the server to render the shortcode based on user supplied attributes. Server-side
 		 * rendering is necessary to allow for shortcodes that incorporate external content based on shortcode
@@ -472,20 +478,16 @@ var Shortcode_UI;
 		 * @method fetchShortcode
 		 * @returns {String} Rendered shortcode markup (HTML).
 		 */
-		fetchShortcode: function() {
-
-			var self = this;
+		fetchShortcode: function( callback ) {
 
 			wp.ajax.post( 'do_shortcode', {
 				post_id: $( '#post_ID' ).val(),
 				shortcode: this.model.formatShortcode(),
 				nonce: shortcodeUIData.nonces.preview,
 			}).done( function( response ) {
-				self.preview = response;
-				self.render();
+				callback( response );
 			}).fail( function() {
-				self.preview = '<span class="shortcake-error">' + shortcodeUIData.strings.mce_view_error + '</span>';
-				self.render();
+				callback( '<span class="shortcake-error">' + shortcodeUIData.strings.mce_view_error + '</span>' );
 			} );
 
 		},
