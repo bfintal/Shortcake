@@ -201,11 +201,13 @@ var Shortcode_UI;
 		},
 
 		initialize: function( options ) {
+
 			Backbone.View.prototype.initialize.apply( this, arguments );
 
 			_.defaults( this.options = ( options || {}), { styles: { group: '', tab: '' } });
 
 			this.tabs = _.extend( this.tabs, options.tabs );
+
 		},
 
 		/**
@@ -214,22 +216,17 @@ var Shortcode_UI;
 		 * @returns {TabbedView}
 		 */
 		render: function() {
+
 			var $content;
 
 			this.$el.html( this.template({ tabs: this.tabs, styles: this.options.styles }) );
 
-			$content = this.$( '[data-role="tab-content"]' );
-			$content.empty();
-
-			_.each( this.tabs, function( tab ) {
-				var $el = tab.content.render().$el;
-				$el.hide();
-				$content.append( $el );
-			});
+			this.$contentContainer = this.$( '[data-role="tab-content"]' );
 
 			this.select( 0 );
 
 			return this;
+
 		},
 
 		/**
@@ -251,31 +248,31 @@ var Shortcode_UI;
 		 * @param selector {number|string} The index (zero based) or key of the target tab.
 		 */
 		select: function( selector ) {
-			var index = 0;
-			var target = null;
-			var tab;
+
+			var index = 0, target = null, tab;
 
 			selector = selector || 0;
 
-			_.each( this.tabs, function( tab, key ) {
+			_.each( this.tabs, function( tab ) {
 				tab.content.$el.hide();
-
-				if ( selector === key || selector === index ) {
-					target = key;
-				}
-
-				index = index + 1;
-			});
+			} );
 
 			this.$( '[data-role="tab"]' ).removeClass( 'active' );
 
-			if ( target ) {
-				tab = this.tabs[target];
+			// Get tab by index.
+			_.each( this.tabs, function( tab, key ) {
+				if ( selector === key || selector === index ) {
+					target = key;
+				}
+				index = index + 1;
+			});
 
+			if ( target ) {
+
+				tab = this.tabs[target];
+				tab.content.render().$el.appendTo( this.$contentContainer ).show();
 				this.$( '[data-role="tab"][data-target="' + target + '"]' ).addClass( 'active' );
 
-				tab.content.$el.show();
-				( typeof tab.open == 'function' ) && tab.open.call( tab.content );
 			}
 		}
 	});
@@ -369,12 +366,8 @@ var Shortcode_UI;
 			var self = this;
 
 			self.head    = self.getEditorStyles().join( "\n" );
-			self.preview = wp.mce.View.prototype.loadingPlaceholder();
-
-			self.fetchShortcode( function( response ) {
-				self.preview = response;
-				self.render();
-			});
+			self.loading = wp.mce.View.prototype.loadingPlaceholder();
+			self.preview = self.loading;
 
 		},
 
@@ -384,6 +377,9 @@ var Shortcode_UI;
 		 * @returns {ShortcodePreview}
 		 */
 		render: function() {
+
+			self.preview = self.loading;
+			this.fetchShortcode();
 
 			this.renderIframe({
 				head: this.head,
@@ -468,7 +464,6 @@ var Shortcode_UI;
 
 		},
 
-
 		/**
 		 * Makes an AJAX call to the server to render the shortcode based on user supplied attributes. Server-side
 		 * rendering is necessary to allow for shortcodes that incorporate external content based on shortcode
@@ -477,16 +472,20 @@ var Shortcode_UI;
 		 * @method fetchShortcode
 		 * @returns {String} Rendered shortcode markup (HTML).
 		 */
-		fetchShortcode: function( callback ) {
+		fetchShortcode: function() {
+
+			var self = this;
 
 			wp.ajax.post( 'do_shortcode', {
 				post_id: $( '#post_ID' ).val(),
 				shortcode: this.model.formatShortcode(),
 				nonce: shortcodeUIData.nonces.preview,
 			}).done( function( response ) {
-				callback( response );
+				self.preview = response;
+				self.render();
 			}).fail( function() {
-				callback( '<span class="shortcake-error">' + shortcodeUIData.strings.mce_view_error + '</span>' );
+				self.preview = '<span class="shortcake-error">' + shortcodeUIData.strings.mce_view_error + '</span>';
+				self.render();
 			} );
 
 		},
@@ -568,9 +567,6 @@ var Shortcode_UI;
 						content: new sui.views.ShortcodePreview({
 							model: shortcode,
 						}),
-						open: function() {
-							this.render();
-						}
 					}
 				},
 				styles: {
